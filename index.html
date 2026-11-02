@@ -1,0 +1,211 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prashant AI Assistant</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #101522;
+    color: white;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.app {
+    width: 100%;
+    max-width: 750px;
+    height: 95vh;
+    background: #192235;
+    border-radius: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+header {
+    background: #202e46;
+    padding: 20px;
+    text-align: center;
+    font-size: 23px;
+    font-weight: bold;
+    border-bottom: 1px solid #34445d;
+}
+
+#chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.message {
+    padding: 13px 16px;
+    margin: 12px 0;
+    border-radius: 12px;
+    max-width: 85%;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.user {
+    background: #2563eb;
+    margin-left: auto;
+}
+
+.bot {
+    background: #2b3a52;
+    margin-right: auto;
+}
+
+.input-area {
+    display: flex;
+    gap: 10px;
+    padding: 15px;
+    background: #202e46;
+}
+
+input {
+    flex: 1;
+    padding: 15px;
+    border: none;
+    outline: none;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 0 22px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:disabled {
+    opacity: .5;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<header>🤖 Prashant AI Assistant</header>
+
+<div id="chat">
+    <div class="message bot">
+        नमस्ते! 👋 मैं Prashant AI हूँ।
+        बताइए, मैं आपकी क्या मदद कर सकता हूँ?
+    </div>
+</div>
+
+<div class="input-area">
+    <input
+        type="text"
+        id="userInput"
+        placeholder="अपना सवाल लिखें..."
+    >
+    <button id="sendBtn" onclick="sendMessage()">
+        Send
+    </button>
+</div>
+
+</div>
+
+<script>
+
+// अपनी API Key यहाँ सीधे न रखें।
+// API को अपने सुरक्षित backend से कॉल करें।
+
+const API_URL = "/api/chat";
+
+async function sendMessage() {
+
+    const input = document.getElementById("userInput");
+    const chat = document.getElementById("chat");
+    const button = document.getElementById("sendBtn");
+
+    const message = input.value.trim();
+
+    if (!message || button.disabled) return;
+
+    addMessage(message, "user");
+    input.value = "";
+
+    button.disabled = true;
+    addMessage("AI सोच रहा है...", "bot");
+
+    try {
+
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: message
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error("API request failed");
+        }
+
+        const data = await response.json();
+
+        const messages = chat.querySelectorAll(".bot");
+        messages[messages.length - 1].textContent =
+            data.reply || "कोई जवाब नहीं मिला।";
+
+    } catch (error) {
+
+        const messages = chat.querySelectorAll(".bot");
+        messages[messages.length - 1].textContent =
+            "AI से कनेक्शन नहीं हो पाया। Backend/API चेक करें।";
+
+        console.error(error);
+
+    } finally {
+        button.disabled = false;
+        chat.scrollTop = chat.scrollHeight;
+    }
+}
+
+function addMessage(text, type) {
+
+    const chat = document.getElementById("chat");
+    const div = document.createElement("div");
+
+    div.className = "message " + type;
+    div.textContent = text;
+
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+document.getElementById("userInput")
+.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+        sendMessage();
+    }
+});
+
+</script>
+
+</body>
+</html>
