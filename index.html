@@ -17,7 +17,7 @@ body {
     font-family: Arial, sans-serif;
     background: #101522;
     color: white;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -56,6 +56,7 @@ header {
     max-width: 85%;
     line-height: 1.6;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .user {
@@ -77,6 +78,7 @@ header {
 
 input {
     flex: 1;
+    min-width: 0;
     padding: 15px;
     border: none;
     outline: none;
@@ -96,8 +98,27 @@ button {
 
 button:disabled {
     opacity: .5;
+    cursor: not-allowed;
 }
 
+@media (max-width: 600px) {
+    .app {
+        height: 100vh;
+        border-radius: 0;
+    }
+
+    header {
+        font-size: 20px;
+    }
+
+    .input-area {
+        padding: 10px;
+    }
+
+    button {
+        padding: 0 15px;
+    }
+}
 </style>
 </head>
 
@@ -119,6 +140,7 @@ button:disabled {
         type="text"
         id="userInput"
         placeholder="अपना सवाल लिखें..."
+        autocomplete="off"
     >
     <button id="sendBtn" onclick="sendMessage()">
         Send
@@ -129,10 +151,22 @@ button:disabled {
 
 <script>
 
-// अपनी API Key यहाँ सीधे न रखें।
-// API को अपने सुरक्षित backend से कॉल करें।
+// ===================================
+// GEMINI API CONFIGURATION
+// ===================================
 
-const API_URL = "/api/chat";
+// अपनी Gemini API Key यहाँ डालें।
+const API_KEY = "YOUR_GEMINI_API_KEY";
+
+// Gemini model
+const MODEL = "gemini-3.8-flash";
+
+// Gemini API URL
+const API_URL =
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
+// Chat history
+const history = [];
 
 async function sendMessage() {
 
@@ -144,44 +178,103 @@ async function sendMessage() {
 
     if (!message || button.disabled) return;
 
+    if (API_KEY === "YOUR_GEMINI_API_KEY") {
+        alert("कृपया अपनी Gemini API Key डालें।");
+        return;
+    }
+
     addMessage(message, "user");
     input.value = "";
 
     button.disabled = true;
-    addMessage("AI सोच रहा है...", "bot");
+
+    const loadingMessage = addMessage(
+        "AI सोच रहा है...",
+        "bot"
+    );
 
     try {
 
+        // Current user message जोड़ें
+        const contents = [
+            ...history,
+            {
+                role: "user",
+                parts: [{ text: message }]
+            }
+        ];
+
         const response = await fetch(API_URL, {
             method: "POST",
+
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "x-goog-api-key": API_KEY
             },
+
             body: JSON.stringify({
-                message: message
+
+                systemInstruction: {
+                    parts: [{
+                        text: "आप Prashant AI हैं। उपयोगकर्ता से हिंदी में विनम्रता से बात करें। उपयोगकर्ता जिस भाषा में प्रश्न करे, उसी भाषा में जवाब दें।"
+                    }]
+                },
+
+                contents: contents,
+
+                generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 2048
+                }
+
             })
         });
 
-        if (!response.ok) {
-            throw new Error("API request failed");
-        }
-
         const data = await response.json();
 
-        const messages = chat.querySelectorAll(".bot");
-        messages[messages.length - 1].textContent =
-            data.reply || "कोई जवाब नहीं मिला।";
+        if (!response.ok) {
+            throw new Error(
+                data.error?.message || "Gemini API request failed"
+            );
+        }
+
+        const reply =
+            data.candidates?.[0]?.content?.parts
+                ?.map(part => part.text || "")
+                .join("")
+                .trim();
+
+        if (!reply) {
+            throw new Error("AI से कोई जवाब नहीं मिला।");
+        }
+
+        loadingMessage.textContent = reply;
+
+        // Conversation history update
+        history.push(
+            {
+                role: "user",
+                parts: [{ text: message }]
+            },
+            {
+                role: "model",
+                parts: [{ text: reply }]
+            }
+        );
 
     } catch (error) {
 
-        const messages = chat.querySelectorAll(".bot");
-        messages[messages.length - 1].textContent =
-            "AI से कनेक्शन नहीं हो पाया। Backend/API चेक करें।";
+        loadingMessage.textContent =
+            "❌ AI से कनेक्शन नहीं हो पाया।\n" +
+            error.message;
 
-        console.error(error);
+        console.error("Gemini Error:", error);
 
     } finally {
+
         button.disabled = false;
+        input.focus();
+
         chat.scrollTop = chat.scrollHeight;
     }
 }
@@ -189,20 +282,26 @@ async function sendMessage() {
 function addMessage(text, type) {
 
     const chat = document.getElementById("chat");
+
     const div = document.createElement("div");
 
     div.className = "message " + type;
     div.textContent = text;
 
     chat.appendChild(div);
+
     chat.scrollTop = chat.scrollHeight;
+
+    return div;
 }
 
 document.getElementById("userInput")
 .addEventListener("keydown", function(event) {
+
     if (event.key === "Enter") {
         sendMessage();
     }
+
 });
 
 </script>
